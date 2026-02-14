@@ -130,6 +130,14 @@ static void EnsureGlyphSlotLocked(Player* player)
 static void LockGlyphSlot(Player* player)
 {
     RemoveGlyphFromSlot(player, OOC_LOCKED_GLYPH_SLOT);
+
+    // Clear slot 5 glyph from inactive spec to prevent it from being
+    // applied during ActivateSpec before our hook can strip it.
+    // glyph6 = slot index 5 in character_glyphs table.
+    CharacterDatabase.Execute(
+        "UPDATE character_glyphs SET glyph6 = 0 WHERE guid = {}",
+        player->GetGUID().GetCounter());
+
     uint32 bits = player->GetUInt32Value(PLAYER_GLYPHS_ENABLED);
     player->SetUInt32Value(PLAYER_GLYPHS_ENABLED,
                            bits & ~OOC_LOCKED_SLOT_BIT);
@@ -217,7 +225,7 @@ public:
         if (result)
         {
             SetOocFfEnabled(guidLow, true);
-            EnsureGlyphSlotLocked(player);
+            LockGlyphSlot(player);
         }
     }
 
