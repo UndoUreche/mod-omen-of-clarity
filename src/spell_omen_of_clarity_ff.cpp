@@ -40,10 +40,6 @@ enum OmenOfClarityMisc
     NPC_KEEPER_REMULOS            = 11832,
     QUEST_A_DEEPER_CONNECTION     = 100005,
     REMULOS_GOSSIP_TEXT           = 14198,
-    // Custom menuId to prevent SmartAI event collision.
-    // Remulos's SmartAI fires spells on gossip select for menuId 10215.
-    // Using a different menuId ensures our toggle option never triggers
-    // the Emerald Dream phasing spell (57413) by accident.
     OOC_GOSSIP_MENU_ID            = 90001,
     OOC_GOSSIP_OPTION_ENABLE      = 0,
     OOC_GOSSIP_OPTION_DISABLE     = 1,
