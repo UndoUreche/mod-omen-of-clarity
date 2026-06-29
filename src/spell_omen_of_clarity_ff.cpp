@@ -53,26 +53,31 @@ enum OmenOfClarityMisc
 // In-memory cache of player GUIDs with feature enabled
 // =====================================================
 static std::mutex s_oocLock;
-static std::unordered_set<uint32> s_oocEnabled;
+static std::unordered_map<uint32, uint8> s_oocEnabled;
 
-static bool IsOocFfEnabled(uint32 guidLow)
+static bool IsOocFfEnabled(uint32 guidLow, uint8 spec)
 {
     std::lock_guard<std::mutex> lock(s_oocLock);
-    return s_oocEnabled.count(guidLow) > 0;
+    return s_oocEnabled.contains(guidLow) && s_oocEnabled.at(guidLow) == spec;
 }
 
 static bool IsOocFfEnabled(Player* player)
 {
-    return IsOocFfEnabled(player->GetGUID().GetCounter());
+    return IsOocFfEnabled(player->GetGUID().GetCounter(), player->GetActiveSpec());
 }
 
-static void SetOocFfEnabled(uint32 guidLow, bool enabled)
+static void SetOocFfEnabled(uint32 guidLow, uint8 spec, bool enabled)
 {
     std::lock_guard<std::mutex> lock(s_oocLock);
     if (enabled)
-        s_oocEnabled.insert(guidLow);
+        s_oocEnabled.insert({guidLow, spec});
     else
         s_oocEnabled.erase(guidLow);
+}
+
+static void SetOocFfEnabled(Player* player, bool enabled)
+{
+    return SetOocFfEnabled(player->GetGUID().GetCounter(), player->GetActiveSpec(), enabled);
 }
 
 // =====================================================
@@ -175,7 +180,7 @@ class spell_ooc_faerie_fire_feral : public SpellScript
         if (!player)
             return;
 
-        if (!IsOocFfEnabled(player->GetGUID().GetCounter()))
+        if (!IsOocFfEnabled(player))
             return;
 
         if (!player->HasAura(SPELL_OMEN_OF_CLARITY))
@@ -215,19 +220,24 @@ public:
     {
         uint32 guidLow = player->GetGUID().GetCounter();
         QueryResult result = CharacterDatabase.Query(
-            "SELECT 1 FROM mod_ooc_ff_enabled WHERE guid = {}",
+            "SELECT spec FROM mod_ooc_ff_enabled WHERE guid = {}",
             guidLow);
 
         if (result)
         {
-            SetOocFfEnabled(guidLow, true);
-            LockGlyphSlot(player);
+            const Field* fields = result->Fetch();
+            const uint8 spec = fields[0].Get<uint8>();
+
+            SetOocFfEnabled(guidLow, spec, true);
+
+            if (IsOocFfEnabled(player)) //lock only if enabled on the active spec
+                LockGlyphSlot(player);
         }
     }
 
     void OnPlayerLogout(Player* player) override
     {
-        SetOocFfEnabled(player->GetGUID().GetCounter(), false);
+        SetOocFfEnabled(player, false);
     }
 
     void OnPlayerCompleteQuest(Player* player, Quest const* quest) override
@@ -236,12 +246,13 @@ public:
             return;
 
         uint32 guidLow = player->GetGUID().GetCounter();
+        uint8 spec = player->GetActiveSpec();
 
         CharacterDatabase.Execute(
-            "INSERT IGNORE INTO mod_ooc_ff_enabled (guid) VALUES ({})",
-            guidLow);
+            "INSERT IGNORE INTO mod_ooc_ff_enabled (guid, spec) VALUES ({}, {})",
+            guidLow, spec);
 
-        SetOocFfEnabled(guidLow, true);
+        SetOocFfEnabled(player, true);
         LockGlyphSlot(player);
 
         if (Creature* remulos = player->FindNearestCreature(
@@ -265,7 +276,8 @@ public:
         {
             RemoveGlyphFromSlot(player, OOC_LOCKED_GLYPH_SLOT);
             EnsureGlyphSlotLocked(player);
-        }
+        } else
+            UnlockGlyphSlot(player);
     }
 
     bool OnPlayerCanCastItemUseSpell(Player* player, Item* /*item*/,
@@ -299,7 +311,7 @@ public:
         player->PrepareGossipMenu(creature, creature->GetGossipMenuId(), true);
 
         // Add the appropriate toggle option from DB (gossip_menu_option 90001)
-        bool enabled = IsOocFfEnabled(player->GetGUID().GetCounter());
+        bool enabled = IsOocFfEnabled(player);
         if (enabled)
             AddGossipItemFor(player, OOC_GOSSIP_MENU_ID,
                 OOC_GOSSIP_OPTION_DISABLE,
@@ -326,12 +338,12 @@ public:
             return false;
 
         uint32 guidLow = player->GetGUID().GetCounter();
-        bool currentlyEnabled = IsOocFfEnabled(guidLow);
+        bool currentlyEnabled = IsOocFfEnabled(player);
         uint32 responseText;
 
         if (currentlyEnabled)
         {
-            SetOocFfEnabled(guidLow, false);
+            SetOocFfEnabled(player, false);
             CharacterDatabase.Execute(
                 "DELETE FROM mod_ooc_ff_enabled WHERE guid = {}",
                 guidLow);
@@ -340,10 +352,12 @@ public:
         }
         else
         {
-            SetOocFfEnabled(guidLow, true);
+            uint8 spec = player->GetActiveSpec();
+
+            SetOocFfEnabled(player, true);
             CharacterDatabase.Execute(
-                "INSERT IGNORE INTO mod_ooc_ff_enabled (guid) VALUES ({})",
-                guidLow);
+                "INSERT IGNORE INTO mod_ooc_ff_enabled (guid, spec) VALUES ({}, {})",
+                guidLow, spec);
             LockGlyphSlot(player);
             responseText = NPC_TEXT_OOC_ENABLED;
         }
