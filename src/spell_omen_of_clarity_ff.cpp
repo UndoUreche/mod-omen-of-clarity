@@ -58,7 +58,7 @@ static std::unordered_map<uint32, uint8> s_oocEnabled;
 static bool IsOocFfEnabled(uint32 guidLow, uint8 spec)
 {
     std::lock_guard<std::mutex> lock(s_oocLock);
-    return s_oocEnabled.contains(guidLow) && s_oocEnabled.at(guidLow) == spec;
+    return s_oocEnabled.contains(guidLow) && (s_oocEnabled.at(guidLow) & 1 << spec) > 0;
 }
 
 static bool IsOocFfEnabled(Player* player)
@@ -66,13 +66,39 @@ static bool IsOocFfEnabled(Player* player)
     return IsOocFfEnabled(player->GetGUID().GetCounter(), player->GetActiveSpec());
 }
 
+static void SetOocFfMask(uint32 guidLow, uint8 mask)
+{
+    std::lock_guard<std::mutex> lock(s_oocLock);
+
+    s_oocEnabled.insert_or_assign(guidLow, mask);
+}
+
+static uint8 GetOocFfMask(uint32 guidLow)
+{
+    if (s_oocEnabled.contains(guidLow))
+        return s_oocEnabled.at(guidLow);
+
+    return 0;
+}
+
 static void SetOocFfEnabled(uint32 guidLow, uint8 spec, bool enabled)
 {
     std::lock_guard<std::mutex> lock(s_oocLock);
+
+    uint8 currentMask = 0;
+    if (s_oocEnabled.contains(guidLow))
+        currentMask = s_oocEnabled.at(guidLow);
+
+    uint8 newMask = 1 << spec;
     if (enabled)
-        s_oocEnabled.insert({guidLow, spec});
+        newMask = currentMask | newMask;
     else
+        newMask = currentMask & ~newMask;
+
+    if (newMask == 0)
         s_oocEnabled.erase(guidLow);
+    else
+        s_oocEnabled.insert_or_assign(guidLow, newMask);
 }
 
 static void SetOocFfEnabled(Player* player, bool enabled)
@@ -226,9 +252,9 @@ public:
         if (result)
         {
             const Field* fields = result->Fetch();
-            const uint8 spec = fields[0].Get<uint8>();
+            const uint8 specMask = fields[0].Get<uint8>();
 
-            SetOocFfEnabled(guidLow, spec, true);
+            SetOocFfMask(guidLow, specMask);
 
             if (IsOocFfEnabled(player)) //lock only if enabled on the active spec
                 LockGlyphSlot(player);
@@ -248,12 +274,12 @@ public:
         uint32 guidLow = player->GetGUID().GetCounter();
         uint8 spec = player->GetActiveSpec();
 
-        CharacterDatabase.Execute(
-            "INSERT IGNORE INTO mod_ooc_ff_enabled (guid, spec) VALUES ({}, {})",
-            guidLow, spec);
-
         SetOocFfEnabled(player, true);
         LockGlyphSlot(player);
+
+        CharacterDatabase.Execute(
+            "INSERT IGNORE INTO mod_ooc_ff_enabled (guid, spec) VALUES ({}, {})",
+            guidLow, GetOocFfMask(guidLow));
 
         if (Creature* remulos = player->FindNearestCreature(
                 NPC_KEEPER_REMULOS, 50.0f))
@@ -344,9 +370,12 @@ public:
         if (currentlyEnabled)
         {
             SetOocFfEnabled(player, false);
-            CharacterDatabase.Execute(
-                "DELETE FROM mod_ooc_ff_enabled WHERE guid = {}",
-                guidLow);
+
+            if (GetOocFfMask(guidLow) == 0)
+                CharacterDatabase.Execute(
+                    "DELETE FROM mod_ooc_ff_enabled WHERE guid = {}",
+                    guidLow);
+
             UnlockGlyphSlot(player);
             responseText = NPC_TEXT_OOC_DISABLED;
         }
@@ -355,9 +384,11 @@ public:
             uint8 spec = player->GetActiveSpec();
 
             SetOocFfEnabled(player, true);
+
             CharacterDatabase.Execute(
                 "INSERT IGNORE INTO mod_ooc_ff_enabled (guid, spec) VALUES ({}, {})",
-                guidLow, spec);
+                guidLow, GetOocFfMask(guidLow));
+
             LockGlyphSlot(player);
             responseText = NPC_TEXT_OOC_ENABLED;
         }
