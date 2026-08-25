@@ -15,9 +15,9 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-void AddOmenOfClaritySpellScripts();
+void AddClassicGlyphScripts();
 
-void Addmod_omen_of_clarityScripts()
+void Addmod_classic_glyphsScripts()
 {
-    AddOmenOfClaritySpellScripts();
+    AddClassicGlyphScripts();
 }

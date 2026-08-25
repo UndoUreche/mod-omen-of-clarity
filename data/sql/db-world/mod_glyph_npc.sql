@@ -1,3 +1,6 @@
+-- ============================================================
+-- Book
+-- ============================================================
 DELETE FROM `gameobject_template` WHERE (`entry` = 42325);
 INSERT INTO `gameobject_template` (`entry`, `type`, `displayId`, `name`, `IconName`, `castBarCaption`, `unk1`, `size`, `Data0`, `Data1`, `Data2`, `Data3`, `Data4`, `Data5`, `Data6`, `Data7`, `Data8`, `Data9`, `Data10`, `Data11`, `Data12`, `Data13`, `Data14`, `Data15`, `Data16`, `Data17`, `Data18`, `Data19`, `Data20`, `Data21`, `Data22`, `Data23`, `AIName`, `ScriptName`, `VerifiedBuild`) VALUES
     (42325, 2, 4677, 'Of Symbols and Sorcery - Part I', '', '', '', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '', 'go_classic_glyph_book', 0);
@@ -6,12 +9,9 @@ DELETE FROM acore_world.gameobject where guid = 6714437;
 INSERT INTO acore_world.gameobject(guid, id, `map`, zoneId, areaId, spawnMask, phaseMask, position_x, position_y, position_z, orientation, rotation0, rotation1, rotation2, rotation3, spawntimesecs, animprogress, state, ScriptName, VerifiedBuild, Comment)
 VALUES(6714437, 42325, 571, 0, 0, 1, 1, 5864.489, 698.78595, 644.2837, -1.45735, 0, 0, -0.665882, 0.746057, 900, 100, 1, '', 0, '');
 
-
-
 -- ============================================================
--- Book Responses (Inactive)
+-- Book Responses
 -- ============================================================
-
 DELETE FROM `npc_text` WHERE `ID` IN (42327, 42328, 42329,42330);
 INSERT INTO `npc_text` (`ID`, `text0_0`, `Probability0`, `text1_0`, `Probability1`, `text2_0`, `Probability2`) VALUES
 (42327, '<Touching this book grants you clarity. You have a vision of fire flying through the sky. But the vision ends too quickly. The book taunts you to read more>', 1,
