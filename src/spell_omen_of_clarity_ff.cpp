@@ -26,27 +26,40 @@
 #include <mutex>
 #include <unordered_set>
 
-static constexpr uint8  OOC_LOCKED_GLYPH_SLOT = 5;
-static constexpr uint32 OOC_LOCKED_SLOT_BIT   = 0x20;
+static constexpr uint8 OOC_LOCKED_GLYPH_SLOT = 5;
+static constexpr uint32 OOC_LOCKED_SLOT_BIT = 0x20;
 
 enum OmenOfClaritySpells
 {
     SPELL_OMEN_OF_CLARITY = 16864,
-    SPELL_CLEARCASTING    = 16870
+    SPELL_CLEARCASTING = 16870
 };
 
 enum OmenOfClarityMisc
 {
-    NPC_KEEPER_REMULOS            = 11832,
-    QUEST_A_DEEPER_CONNECTION     = 100005,
-    REMULOS_GOSSIP_TEXT           = 14198,
-    OOC_GOSSIP_MENU_ID            = 90001,
-    OOC_GOSSIP_OPTION_ENABLE      = 0,
-    OOC_GOSSIP_OPTION_DISABLE     = 1,
-    OOC_GOSSIP_SENDER             = 50000,
-    OOC_GOSSIP_ACTION_TOGGLE      = 1,
-    NPC_TEXT_OOC_ENABLED          = 90001,
-    NPC_TEXT_OOC_DISABLED         = 90002
+    // NPC_KEEPER_REMULOS = 11832,
+    // QUEST_A_DEEPER_CONNECTION = 100005,
+    // REMULOS_GOSSIP_TEXT = 14198,
+    // OOC_GOSSIP_MENU_ID = 90001,
+    // OOC_GOSSIP_OPTION_ENABLE = 0,
+    // OOC_GOSSIP_OPTION_DISABLE = 1,
+    // OOC_GOSSIP_SENDER = 50000,
+    // OOC_GOSSIP_ACTION_TOGGLE = 1,
+    NPC_TEXT_OOC_ENABLED = 90001,
+    NPC_TEXT_OOC_DISABLED = 90002,
+
+    BOOK_GOBJECT_ID = 42325,
+
+    BOOK_DISABLED_NPC_TEXT = 42327,
+    BOOK_DRUID_NPC_TEXT = 42328,
+    BOOK_PALADIN_NPC_TEXT = 42329,
+    BOOK_HUNTER_NPC_TEXT = 42330,
+
+    BOOK_GOSSIP_MENU_ID = 90001,
+    BOOK_GOSSIP_SENDER = 80000,
+
+    BOOK_GOSSIP_ACTION_INSPECT = 0,
+    BOOK_GOSSIP_ACTION_PURGE = 1
 };
 
 // =====================================================
@@ -61,7 +74,7 @@ static bool IsOocFfEnabled(uint32 guidLow, uint8 spec)
     return s_oocEnabled.contains(guidLow) && (s_oocEnabled.at(guidLow) & 1 << spec) > 0;
 }
 
-static bool IsOocFfEnabled(Player* player)
+static bool IsOocFfEnabled(Player *player)
 {
     return IsOocFfEnabled(player->GetGUID().GetCounter(), player->GetActiveSpec());
 }
@@ -101,7 +114,7 @@ static void SetOocFfEnabled(uint32 guidLow, uint8 spec, bool enabled)
         s_oocEnabled.insert_or_assign(guidLow, newMask);
 }
 
-static void SetOocFfEnabled(Player* player, bool enabled)
+static void SetOocFfEnabled(Player *player, bool enabled)
 {
     return SetOocFfEnabled(player->GetGUID().GetCounter(), player->GetActiveSpec(), enabled);
 }
@@ -109,24 +122,24 @@ static void SetOocFfEnabled(Player* player, bool enabled)
 // =====================================================
 // Glyph slot locking helpers
 // =====================================================
-static void RemoveGlyphFromSlot(Player* player, uint8 slot)
+static void RemoveGlyphFromSlot(Player *player, uint8 slot)
 {
     uint32 glyph = player->GetGlyph(slot);
     if (!glyph)
         return;
 
-    GlyphPropertiesEntry const* glyphEntry =
-        sGlyphPropertiesStore.LookupEntry(glyph);
+    GlyphPropertiesEntry const *glyphEntry =
+            sGlyphPropertiesStore.LookupEntry(glyph);
     if (!glyphEntry)
         return;
 
     player->RemoveAurasDueToSpell(glyphEntry->SpellId);
 
-    Unit::AuraMap& ownedAuras = player->GetOwnedAuras();
+    Unit::AuraMap &ownedAuras = player->GetOwnedAuras();
     for (auto iter = ownedAuras.begin(); iter != ownedAuras.end();)
     {
-        Aura* aura = iter->second;
-        if (SpellInfo const* triggeredBy =
+        Aura *aura = iter->second;
+        if (SpellInfo const *triggeredBy =
                 aura->GetTriggeredByAuraSpellInfo())
         {
             if (triggeredBy->Id == glyphEntry->SpellId)
@@ -143,7 +156,7 @@ static void RemoveGlyphFromSlot(Player* player, uint8 slot)
     player->SendTalentsInfoData(false);
 }
 
-static void EnsureGlyphSlotLocked(Player* player)
+static void EnsureGlyphSlotLocked(Player *player)
 {
     uint32 bits = player->GetUInt32Value(PLAYER_GLYPHS_ENABLED);
     if (bits & OOC_LOCKED_SLOT_BIT)
@@ -154,7 +167,7 @@ static void EnsureGlyphSlotLocked(Player* player)
     }
 }
 
-static void LockGlyphSlot(Player* player)
+static void LockGlyphSlot(Player *player)
 {
     RemoveGlyphFromSlot(player, OOC_LOCKED_GLYPH_SLOT);
 
@@ -171,7 +184,7 @@ static void LockGlyphSlot(Player* player)
     player->SendTalentsInfoData(false);
 }
 
-static void UnlockGlyphSlot(Player* player)
+static void UnlockGlyphSlot(Player *player)
 {
     if (player->GetLevel() >= 80)
     {
@@ -189,20 +202,20 @@ class spell_ooc_faerie_fire_feral : public SpellScript
 {
     PrepareSpellScript(spell_ooc_faerie_fire_feral);
 
-    bool Validate(SpellInfo const* /*spellInfo*/) override
+    bool Validate(SpellInfo const * /*spellInfo*/) override
     {
-        return ValidateSpellInfo({ SPELL_OMEN_OF_CLARITY, SPELL_CLEARCASTING });
+        return ValidateSpellInfo({SPELL_OMEN_OF_CLARITY, SPELL_CLEARCASTING});
     }
 
     void HandleAfterHit()
     {
-        Unit* caster = GetCaster();
-        Unit* target = GetHitUnit();
+        Unit *caster = GetCaster();
+        Unit *target = GetHitUnit();
 
         if (!caster || !target)
             return;
 
-        Player* player = caster->ToPlayer();
+        Player *player = caster->ToPlayer();
         if (!player)
             return;
 
@@ -215,7 +228,7 @@ class spell_ooc_faerie_fire_feral : public SpellScript
         if (target->GetTypeId() == TYPEID_PLAYER)
             return;
 
-        if (Creature* creature = target->ToCreature())
+        if (Creature *creature = target->ToCreature())
             if (creature->IsPet() && creature->GetOwner() &&
                 creature->GetOwner()->GetTypeId() == TYPEID_PLAYER)
                 return;
@@ -236,13 +249,17 @@ class ooc_ff_player_script : public PlayerScript
 {
 public:
     ooc_ff_player_script() : PlayerScript("ooc_ff_player_script",
-        {PLAYERHOOK_ON_LOGIN, PLAYERHOOK_ON_LOGOUT,
-         PLAYERHOOK_ON_PLAYER_COMPLETE_QUEST,
-         PLAYERHOOK_ON_LEVEL_CHANGED,
-         PLAYERHOOK_ON_AFTER_SPEC_SLOT_CHANGED,
-         PLAYERHOOK_CAN_CAST_ITEM_USE_SPELL}) { }
+                                          {
+                                              PLAYERHOOK_ON_LOGIN, PLAYERHOOK_ON_LOGOUT,
+                                              PLAYERHOOK_ON_PLAYER_COMPLETE_QUEST,
+                                              PLAYERHOOK_ON_LEVEL_CHANGED,
+                                              PLAYERHOOK_ON_AFTER_SPEC_SLOT_CHANGED,
+                                              PLAYERHOOK_CAN_CAST_ITEM_USE_SPELL
+                                          })
+    {
+    }
 
-    void OnPlayerLogin(Player* player) override
+    void OnPlayerLogin(Player *player) override
     {
         uint32 guidLow = player->GetGUID().GetCounter();
         QueryResult result = CharacterDatabase.Query(
@@ -251,7 +268,7 @@ public:
 
         if (result)
         {
-            const Field* fields = result->Fetch();
+            const Field *fields = result->Fetch();
             const uint8 specMask = fields[0].Get<uint8>();
 
             SetOocFfMask(guidLow, specMask);
@@ -261,41 +278,41 @@ public:
         }
     }
 
-    void OnPlayerLogout(Player* player) override
+    void OnPlayerLogout(Player *player) override
     {
         SetOocFfEnabled(player, false);
     }
 
-    void OnPlayerCompleteQuest(Player* player, Quest const* quest) override
-    {
-        if (quest->GetQuestId() != QUEST_A_DEEPER_CONNECTION)
-            return;
+    // void OnPlayerCompleteQuest(Player *player, Quest const *quest) override
+    // {
+    //     if (quest->GetQuestId() != QUEST_A_DEEPER_CONNECTION)
+    //         return;
+    //
+    //     uint32 guidLow = player->GetGUID().GetCounter();
+    //     uint8 spec = player->GetActiveSpec();
+    //
+    //     SetOocFfEnabled(player, true);
+    //     LockGlyphSlot(player);
+    //
+    //     CharacterDatabase.Execute(
+    //         "INSERT IGNORE INTO mod_ooc_ff_enabled (guid, spec) VALUES ({}, {})",
+    //         guidLow, GetOocFfMask(guidLow));
+    //
+    //     if (Creature *remulos = player->FindNearestCreature(
+    //         NPC_KEEPER_REMULOS, 50.0f))
+    //     {
+    //         remulos->SendPlaySpellVisual(179);
+    //         remulos->SendPlaySpellImpact(player->GetGUID(), 362);
+    //     }
+    // }
 
-        uint32 guidLow = player->GetGUID().GetCounter();
-        uint8 spec = player->GetActiveSpec();
-
-        SetOocFfEnabled(player, true);
-        LockGlyphSlot(player);
-
-        CharacterDatabase.Execute(
-            "INSERT IGNORE INTO mod_ooc_ff_enabled (guid, spec) VALUES ({}, {})",
-            guidLow, GetOocFfMask(guidLow));
-
-        if (Creature* remulos = player->FindNearestCreature(
-                NPC_KEEPER_REMULOS, 50.0f))
-        {
-            remulos->SendPlaySpellVisual(179);
-            remulos->SendPlaySpellImpact(player->GetGUID(), 362);
-        }
-    }
-
-    void OnPlayerLevelChanged(Player* player, uint8 /*oldLevel*/) override
+    void OnPlayerLevelChanged(Player *player, uint8 /*oldLevel*/) override
     {
         if (IsOocFfEnabled(player))
             EnsureGlyphSlotLocked(player);
     }
 
-    void OnPlayerAfterSpecSlotChanged(Player* player,
+    void OnPlayerAfterSpecSlotChanged(Player *player,
                                       uint8 /*newSlot*/) override
     {
         if (IsOocFfEnabled(player))
@@ -306,8 +323,8 @@ public:
             UnlockGlyphSlot(player);
     }
 
-    bool OnPlayerCanCastItemUseSpell(Player* player, Item* /*item*/,
-                                     SpellCastTargets const& /*targets*/,
+    bool OnPlayerCanCastItemUseSpell(Player *player, Item * /*item*/,
+                                     SpellCastTargets const & /*targets*/,
                                      uint8 /*castCount*/,
                                      uint32 glyphIndex) override
     {
@@ -316,58 +333,174 @@ public:
         return true;
     }
 };
+//
+// // =====================================================
+// // Gossip toggle on Keeper Remulos (AllCreatureScript)
+// // =====================================================
+// class ooc_ff_remulos_gossip : public AllCreatureScript
+// {
+// public:
+//     ooc_ff_remulos_gossip() : AllCreatureScript("ooc_ff_remulos_gossip")
+//     {
+//     }
+//
+//     bool CanCreatureGossipHello(Player *player, Creature *creature) override
+//     {
+//         if (creature->GetEntry() != NPC_KEEPER_REMULOS)
+//             return false;
+//
+//         if (!player->GetQuestRewardStatus(QUEST_A_DEEPER_CONNECTION))
+//             return false;
+//
+//         // Build the normal gossip menu (DB options + quest icons)
+//         player->PrepareGossipMenu(creature, creature->GetGossipMenuId(), true);
+//
+//         // Add the appropriate toggle option from DB (gossip_menu_option 90001)
+//         bool enabled = IsOocFfEnabled(player);
+//         if (enabled)
+//             AddGossipItemFor(player, OOC_GOSSIP_MENU_ID,
+//                              OOC_GOSSIP_OPTION_DISABLE,
+//                              OOC_GOSSIP_SENDER, OOC_GOSSIP_ACTION_TOGGLE);
+//         else
+//             AddGossipItemFor(player, OOC_GOSSIP_MENU_ID,
+//                              OOC_GOSSIP_OPTION_ENABLE,
+//                              OOC_GOSSIP_SENDER, OOC_GOSSIP_ACTION_TOGGLE);
+//
+//         // Override the menuId so SmartAI gossip-select events (which check
+//         // menuId 10215) do not fire when the player clicks our option.
+//         player->PlayerTalkClass->GetGossipMenu().SetMenuId(OOC_GOSSIP_MENU_ID);
+//         SendGossipMenuFor(player, REMULOS_GOSSIP_TEXT, creature);
+//         return true;
+//     }
+//
+//     bool CanCreatureGossipSelect(Player *player, Creature *creature,
+//                                  uint32 sender, uint32 /*action*/) override
+//     {
+//         if (creature->GetEntry() != NPC_KEEPER_REMULOS)
+//             return false;
+//
+//         if (sender != OOC_GOSSIP_SENDER)
+//             return false;
+//
+//         uint32 guidLow = player->GetGUID().GetCounter();
+//         bool currentlyEnabled = IsOocFfEnabled(player);
+//         uint32 responseText;
+//
+//         if (currentlyEnabled)
+//         {
+//             SetOocFfEnabled(player, false);
+//
+//             if (GetOocFfMask(guidLow) == 0)
+//                 CharacterDatabase.Execute(
+//                     "DELETE FROM mod_ooc_ff_enabled WHERE guid = {}",
+//                     guidLow);
+//
+//             UnlockGlyphSlot(player);
+//             responseText = NPC_TEXT_OOC_DISABLED;
+//         } else
+//         {
+//             uint8 spec = player->GetActiveSpec();
+//
+//             SetOocFfEnabled(player, true);
+//
+//             CharacterDatabase.Execute(
+//                 "INSERT IGNORE INTO mod_ooc_ff_enabled (guid, spec) VALUES ({}, {})",
+//                 guidLow, GetOocFfMask(guidLow));
+//
+//             LockGlyphSlot(player);
+//             responseText = NPC_TEXT_OOC_ENABLED;
+//         }
+//
+//         creature->SendPlaySpellVisual(179);
+//         creature->SendPlaySpellImpact(player->GetGUID(), 362);
+//
+//         ClearGossipMenuFor(player);
+//         SendGossipMenuFor(player, responseText, creature);
+//         return true;
+//     }
+// };
 
-// =====================================================
-// Gossip toggle on Keeper Remulos (AllCreatureScript)
-// =====================================================
-class ooc_ff_remulos_gossip : public AllCreatureScript
+
+class go_classic_glyph_book : public GameObjectScript
 {
-public:
-    ooc_ff_remulos_gossip() : AllCreatureScript("ooc_ff_remulos_gossip") { }
-
-    bool CanCreatureGossipHello(Player* player, Creature* creature) override
+    static bool modAvailableForClass(uint32 playerClass)
     {
-        if (creature->GetEntry() != NPC_KEEPER_REMULOS)
-            return false;
+        return playerClass == CLASS_DRUID
+               || playerClass == CLASS_HUNTER
+               || playerClass == CLASS_PALADIN;
+    }
 
-        if (!player->GetQuestRewardStatus(QUEST_A_DEEPER_CONNECTION))
+public:
+    go_classic_glyph_book() : GameObjectScript("go_classic_glyph_book")
+    {
+    }
+
+    bool OnGossipHello(Player *player, GameObject *gameobject) override
+    {
+        // SendGossipMenuFor(player, player->GetGossipTextId(gameobject), gameobject->GetGUID());
+        // return true;
+
+        if (gameobject->GetEntry() != BOOK_GOBJECT_ID)
             return false;
 
         // Build the normal gossip menu (DB options + quest icons)
-        player->PrepareGossipMenu(creature, creature->GetGossipMenuId(), true);
+        player->PrepareGossipMenu(gameobject, DEFAULT_GOSSIP_MESSAGE, true);
 
-        // Add the appropriate toggle option from DB (gossip_menu_option 90001)
-        bool enabled = IsOocFfEnabled(player);
-        if (enabled)
-            AddGossipItemFor(player, OOC_GOSSIP_MENU_ID,
-                OOC_GOSSIP_OPTION_DISABLE,
-                OOC_GOSSIP_SENDER, OOC_GOSSIP_ACTION_TOGGLE);
-        else
-            AddGossipItemFor(player, OOC_GOSSIP_MENU_ID,
-                OOC_GOSSIP_OPTION_ENABLE,
-                OOC_GOSSIP_SENDER, OOC_GOSSIP_ACTION_TOGGLE);
+        uint32 textId;
 
-        // Override the menuId so SmartAI gossip-select events (which check
-        // menuId 10215) do not fire when the player clicks our option.
-        player->PlayerTalkClass->GetGossipMenu().SetMenuId(OOC_GOSSIP_MENU_ID);
-        SendGossipMenuFor(player, REMULOS_GOSSIP_TEXT, creature);
+        if (const uint32 playerClass = player->getClass(); modAvailableForClass(playerClass))
+        {
+            switch (playerClass)
+            {
+                case CLASS_DRUID:
+                    textId = BOOK_DRUID_NPC_TEXT;
+                    break;
+                case CLASS_HUNTER:
+                    textId = BOOK_HUNTER_NPC_TEXT;
+                    break;
+                default:
+                    textId = BOOK_PALADIN_NPC_TEXT;
+                    break;
+            }
+
+            const uint32 optionId = IsOocFfEnabled(player)
+                                        ? BOOK_GOSSIP_ACTION_PURGE
+                                        : BOOK_GOSSIP_ACTION_INSPECT;
+
+            AddGossipItemFor(player, BOOK_GOSSIP_MENU_ID, optionId, BOOK_GOSSIP_SENDER, optionId);
+        } else
+        {
+            textId = BOOK_DISABLED_NPC_TEXT;
+        }
+
+        SendGossipMenuFor(player, textId, gameobject->GetGUID());
+
         return true;
     }
 
-    bool CanCreatureGossipSelect(Player* player, Creature* creature,
-                                 uint32 sender, uint32 /*action*/) override
+    bool OnGossipSelect(Player *player, GameObject *gameObject, uint32 sender, uint32 action) override
     {
-        if (creature->GetEntry() != NPC_KEEPER_REMULOS)
+        if (gameObject->GetEntry() != BOOK_GOBJECT_ID)
             return false;
 
-        if (sender != OOC_GOSSIP_SENDER)
+        if (sender != BOOK_GOSSIP_SENDER)
             return false;
 
         uint32 guidLow = player->GetGUID().GetCounter();
         bool currentlyEnabled = IsOocFfEnabled(player);
-        uint32 responseText;
+        uint32 responseId;
 
-        if (currentlyEnabled)
+        if (action == BOOK_GOSSIP_ACTION_INSPECT)
+        {
+            SetOocFfEnabled(player, true);
+
+            CharacterDatabase.Execute(
+                "INSERT IGNORE INTO mod_ooc_ff_enabled (guid, spec) VALUES ({}, {})",
+                guidLow, GetOocFfMask(guidLow));
+
+            LockGlyphSlot(player);
+            responseId = NPC_TEXT_OOC_ENABLED;
+        } else
         {
             SetOocFfEnabled(player, false);
 
@@ -377,27 +510,12 @@ public:
                     guidLow);
 
             UnlockGlyphSlot(player);
-            responseText = NPC_TEXT_OOC_DISABLED;
+            responseId = NPC_TEXT_OOC_DISABLED;
         }
-        else
-        {
-            uint8 spec = player->GetActiveSpec();
-
-            SetOocFfEnabled(player, true);
-
-            CharacterDatabase.Execute(
-                "INSERT IGNORE INTO mod_ooc_ff_enabled (guid, spec) VALUES ({}, {})",
-                guidLow, GetOocFfMask(guidLow));
-
-            LockGlyphSlot(player);
-            responseText = NPC_TEXT_OOC_ENABLED;
-        }
-
-        creature->SendPlaySpellVisual(179);
-        creature->SendPlaySpellImpact(player->GetGUID(), 362);
 
         ClearGossipMenuFor(player);
-        SendGossipMenuFor(player, responseText, creature);
+        SendGossipMenuFor(player, responseId, gameObject->GetOwnerGUID());
+
         return true;
     }
 };
@@ -406,5 +524,6 @@ void AddOmenOfClaritySpellScripts()
 {
     RegisterSpellScript(spell_ooc_faerie_fire_feral);
     new ooc_ff_player_script();
-    new ooc_ff_remulos_gossip();
+    // new ooc_ff_remulos_gossip();
+    new go_classic_glyph_book();
 }
