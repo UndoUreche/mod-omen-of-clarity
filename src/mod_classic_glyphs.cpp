@@ -31,6 +31,7 @@ static constexpr uint32 MOD_LOCKED_SLOT_BIT = 0x20;
 
 enum ClassicGlyphsModSpells
 {
+    SPELL_HAND_OF_RECKONING = 67485,
     SPELL_OMEN_OF_CLARITY = 16864,
     SPELL_CLEARCASTING = 16870
 };
@@ -192,6 +193,7 @@ static void UnlockGlyphSlot(Player *player)
 // =====================================================
 class spell_ooc_faerie_fire_feral : public SpellScript
 {
+public:
     PrepareSpellScript(spell_ooc_faerie_fire_feral);
 
     bool Validate(SpellInfo const * /*spellInfo*/) override
@@ -231,6 +233,69 @@ class spell_ooc_faerie_fire_feral : public SpellScript
     void Register() override
     {
         AfterHit += SpellHitFn(spell_ooc_faerie_fire_feral::HandleAfterHit);
+    }
+};
+
+// =====================================================
+// 62124 - Hand of Reckoning doesn't taunt, always damages
+// =====================================================
+class spell_pal_hand_of_reckoning_glyph : public SpellScript
+{
+    public:
+
+    PrepareSpellScript(spell_pal_hand_of_reckoning_glyph);
+
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_HAND_OF_RECKONING });
+    }
+
+    void HandleTaunt(SpellEffIndex effIndex)
+    {
+        Unit* caster = GetCaster();
+
+        if (!caster || !caster->ToPlayer())
+            return;
+
+        if (!IsModEnabled(caster->ToPlayer()))
+            return;
+
+        PreventHitDefaultEffect(effIndex);
+    }
+
+    void HandleTauntAura(SpellEffIndex /*effIndex*/)
+    {
+        Unit* caster = GetCaster();
+
+        if (!caster || !caster->ToPlayer())
+            return;
+
+        if (!IsModEnabled(caster->ToPlayer()))
+            return;
+
+        PreventHitAura();
+    }
+
+    void HandleHit()
+    {
+        Unit* caster = GetCaster();
+        Unit* target = GetHitUnit();
+
+        if (!caster || !target)
+            return;
+
+        if (!IsModEnabled(caster->ToPlayer()))
+            return;
+
+        caster->CastSpell(target, SPELL_HAND_OF_RECKONING, true);
+    }
+
+    void Register() override
+    {
+        OnHit += SpellHitFn(spell_pal_hand_of_reckoning_glyph::HandleHit);
+
+        OnEffectHitTarget += SpellEffectFn(spell_pal_hand_of_reckoning_glyph::HandleTaunt,EFFECT_0, SPELL_EFFECT_ATTACK_ME);
+        OnEffectHitTarget += SpellEffectFn(spell_pal_hand_of_reckoning_glyph::HandleTauntAura,EFFECT_1, SPELL_EFFECT_APPLY_AURA);
     }
 };
 
@@ -308,7 +373,7 @@ class go_classic_glyph_book : public GameObjectScript
     static bool modAvailableForClass(uint32 playerClass)
     {
         return playerClass == CLASS_DRUID
-               || playerClass == CLASS_HUNTER
+               // || playerClass == CLASS_HUNTER
                || playerClass == CLASS_PALADIN;
     }
 
@@ -319,9 +384,6 @@ public:
 
     bool OnGossipHello(Player *player, GameObject *gameobject) override
     {
-        // SendGossipMenuFor(player, player->GetGossipTextId(gameobject), gameobject->GetGUID());
-        // return true;
-
         if (gameobject->GetEntry() != BOOK_GOBJECT_ID)
             return false;
 
@@ -337,9 +399,9 @@ public:
                 case CLASS_DRUID:
                     textId = BOOK_DRUID_NPC_TEXT;
                     break;
-                case CLASS_HUNTER:
-                    textId = BOOK_HUNTER_NPC_TEXT;
-                    break;
+                // case CLASS_HUNTER: TODO hunter explosive trap launcher (scroll of burning arrow)
+                //     textId = BOOK_HUNTER_NPC_TEXT;
+                //     break;
                 default:
                     textId = BOOK_PALADIN_NPC_TEXT;
                     break;
@@ -367,6 +429,18 @@ public:
 
         if (sender != BOOK_GOSSIP_SENDER)
             return false;
+
+        //TODO the fucking cost!
+        //
+        // GossipMenuItem const* item = player->PlayerTalkClass->GetGossipMenu().GetItem(action);
+        // const bool playerTooPoor = item and !player->HasEnoughMoney(item->BoxMoney);
+        //
+        // // call default behavior to handle the money transaction
+        // const uint32 menuId = player->PlayerTalkClass->GetGossipMenu().GetMenuId();
+        // player->OnGossipSelect(gameObject, action, menuId);
+        //
+        // if (playerTooPoor)
+        //     return false;
 
         uint32 guidLow = player->GetGUID().GetCounter();
         uint32 responseId;
@@ -404,6 +478,8 @@ public:
 void AddClassicGlyphScripts()
 {
     RegisterSpellScript(spell_ooc_faerie_fire_feral);
+    RegisterSpellScript(spell_pal_hand_of_reckoning_glyph);
+
     new classic_glyph_player_script();
     new go_classic_glyph_book();
 }
