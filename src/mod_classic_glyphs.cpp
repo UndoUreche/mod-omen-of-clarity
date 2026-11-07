@@ -222,9 +222,10 @@ public:
         if (target->GetTypeId() == TYPEID_PLAYER)
             return;
 
-        if (Creature *creature = target->ToCreature())
-            if (creature->IsPet() && creature->GetOwner() &&
-                creature->GetOwner()->GetTypeId() == TYPEID_PLAYER)
+        if (const Creature *creature = target->ToCreature())
+            if ((creature->IsPet() || creature->IsGuardian())
+                && creature->GetOwner()
+                && creature->GetOwner()->GetTypeId() == TYPEID_PLAYER)
                 return;
 
         player->CastSpell(player, SPELL_CLEARCASTING, true);
@@ -241,31 +242,38 @@ public:
 // =====================================================
 class spell_pal_hand_of_reckoning_glyph : public SpellScript
 {
-    public:
-
+public:
     PrepareSpellScript(spell_pal_hand_of_reckoning_glyph);
 
-    bool Validate(SpellInfo const* /*spellInfo*/) override
+    bool Validate(SpellInfo const * /*spellInfo*/) override
     {
-        return ValidateSpellInfo({ SPELL_HAND_OF_RECKONING });
+        return ValidateSpellInfo({SPELL_HAND_OF_RECKONING});
     }
 
     void HandleTaunt(SpellEffIndex effIndex)
     {
-        Unit* caster = GetCaster();
+        Unit *caster = GetCaster();
+        Unit *target = GetHitUnit();
 
         if (!caster || !caster->ToPlayer())
             return;
 
         if (!IsModEnabled(caster->ToPlayer()))
             return;
+
+        if (const Creature *creature = target->ToCreature())
+            if ((creature->IsPet() || creature->IsGuardian())
+                && creature->GetOwner()
+                && creature->GetOwner()->GetTypeId() == TYPEID_PLAYER)
+                return;
 
         PreventHitDefaultEffect(effIndex);
     }
 
     void HandleTauntAura(SpellEffIndex /*effIndex*/)
     {
-        Unit* caster = GetCaster();
+        Unit *caster = GetCaster();
+        Unit *target = GetHitUnit();
 
         if (!caster || !caster->ToPlayer())
             return;
@@ -273,19 +281,34 @@ class spell_pal_hand_of_reckoning_glyph : public SpellScript
         if (!IsModEnabled(caster->ToPlayer()))
             return;
 
+        if (const Creature *creature = target->ToCreature())
+            if ((creature->IsPet() || creature->IsGuardian())
+                && creature->GetOwner()
+                && creature->GetOwner()->GetTypeId() == TYPEID_PLAYER)
+                return;
+
         PreventHitAura();
     }
 
     void HandleHit()
     {
-        Unit* caster = GetCaster();
-        Unit* target = GetHitUnit();
+        Unit *caster = GetCaster();
+        Unit *target = GetHitUnit();
 
         if (!caster || !target)
             return;
 
         if (!IsModEnabled(caster->ToPlayer()))
             return;
+
+        if (target->GetTypeId() == TYPEID_PLAYER)
+            return;
+
+        if (const Creature *creature = target->ToCreature())
+            if ((creature->IsPet() || creature->IsGuardian())
+                && creature->GetOwner()
+                && creature->GetOwner()->GetTypeId() == TYPEID_PLAYER)
+                return;
 
         caster->CastSpell(target, SPELL_HAND_OF_RECKONING, true);
     }
@@ -294,8 +317,10 @@ class spell_pal_hand_of_reckoning_glyph : public SpellScript
     {
         OnHit += SpellHitFn(spell_pal_hand_of_reckoning_glyph::HandleHit);
 
-        OnEffectHitTarget += SpellEffectFn(spell_pal_hand_of_reckoning_glyph::HandleTaunt,EFFECT_0, SPELL_EFFECT_ATTACK_ME);
-        OnEffectHitTarget += SpellEffectFn(spell_pal_hand_of_reckoning_glyph::HandleTauntAura,EFFECT_1, SPELL_EFFECT_APPLY_AURA);
+        OnEffectHitTarget += SpellEffectFn(spell_pal_hand_of_reckoning_glyph::HandleTaunt, EFFECT_0,
+                                           SPELL_EFFECT_ATTACK_ME);
+        OnEffectHitTarget += SpellEffectFn(spell_pal_hand_of_reckoning_glyph::HandleTauntAura, EFFECT_1,
+                                           SPELL_EFFECT_APPLY_AURA);
     }
 };
 
@@ -306,13 +331,13 @@ class classic_glyph_player_script : public PlayerScript
 {
 public:
     classic_glyph_player_script() : PlayerScript("classic_glyph_player_script",
-                                          {
-                                              PLAYERHOOK_ON_LOGIN, PLAYERHOOK_ON_LOGOUT,
-                                              PLAYERHOOK_ON_PLAYER_COMPLETE_QUEST,
-                                              PLAYERHOOK_ON_LEVEL_CHANGED,
-                                              PLAYERHOOK_ON_AFTER_SPEC_SLOT_CHANGED,
-                                              PLAYERHOOK_CAN_CAST_ITEM_USE_SPELL
-                                          })
+                                                 {
+                                                     PLAYERHOOK_ON_LOGIN, PLAYERHOOK_ON_LOGOUT,
+                                                     PLAYERHOOK_ON_PLAYER_COMPLETE_QUEST,
+                                                     PLAYERHOOK_ON_LEVEL_CHANGED,
+                                                     PLAYERHOOK_ON_AFTER_SPEC_SLOT_CHANGED,
+                                                     PLAYERHOOK_CAN_CAST_ITEM_USE_SPELL
+                                                 })
     {
     }
 
@@ -370,11 +395,12 @@ public:
 
 class go_classic_glyph_book : public GameObjectScript
 {
-    static bool modAvailableForClass(uint32 playerClass)
+    static bool modAvailableForPlayer(Player *player)
     {
-        return playerClass == CLASS_DRUID
-               // || playerClass == CLASS_HUNTER
-               || playerClass == CLASS_PALADIN;
+        const uint32 playerClass = player->getClass();
+        const uint8 playerLevel = player->GetLevel();
+
+        return playerLevel >= 80 && (playerClass == CLASS_DRUID || playerClass == CLASS_PALADIN);
     }
 
 public:
@@ -392,16 +418,15 @@ public:
 
         uint32 textId;
 
-        if (const uint32 playerClass = player->getClass(); modAvailableForClass(playerClass))
+        if (modAvailableForPlayer(player))
         {
+            const uint32 playerClass = player->getClass();
+
             switch (playerClass)
             {
                 case CLASS_DRUID:
                     textId = BOOK_DRUID_NPC_TEXT;
                     break;
-                // case CLASS_HUNTER: TODO hunter explosive trap launcher (scroll of burning arrow)
-                //     textId = BOOK_HUNTER_NPC_TEXT;
-                //     break;
                 default:
                     textId = BOOK_PALADIN_NPC_TEXT;
                     break;
@@ -429,18 +454,6 @@ public:
 
         if (sender != BOOK_GOSSIP_SENDER)
             return false;
-
-        //TODO the fucking cost!
-        //
-        // GossipMenuItem const* item = player->PlayerTalkClass->GetGossipMenu().GetItem(action);
-        // const bool playerTooPoor = item and !player->HasEnoughMoney(item->BoxMoney);
-        //
-        // // call default behavior to handle the money transaction
-        // const uint32 menuId = player->PlayerTalkClass->GetGossipMenu().GetMenuId();
-        // player->OnGossipSelect(gameObject, action, menuId);
-        //
-        // if (playerTooPoor)
-        //     return false;
 
         uint32 guidLow = player->GetGUID().GetCounter();
         uint32 responseId;
