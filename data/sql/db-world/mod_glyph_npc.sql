@@ -26,11 +26,7 @@ INSERT INTO `npc_text` (`ID`, `text0_0`, `Probability0`) VALUES
 INSERT INTO `npc_text` (`ID`, `text0_0`, `Probability0`) VALUES
 (42329, '<The letters shift as you open the book...>\n\n [Glyph of Reckoning]\n"Your Hand of Reckoning spell no longer taunts the target and can deal damage to untauntable targets."', 1);
 
--- hunter
--- INSERT INTO `npc_text` (`ID`, `text0_0`, `Probability0`) VALUES
--- (42330, '<The letters shift as you open the book...>\n\n [Scroll of Burning Arrow]\n"Modifies your freezing arrow to place an Explosive Trap at the target location that explodes when an enemy approaches, causing  Fire damage and burning all enemies for 20 sec within 10 yards. Trap will exist for 30 sec. Only one trap can be active at a time."', 1);
-
--- Gossip menu entries for our custom OoC toggle menu (menuId 90001)
+-- Gossip menu entries for our toggle menu (menuId 90001)
 DELETE FROM `gossip_menu` WHERE `MenuID` = 90001;
 INSERT INTO `gossip_menu` (`MenuID`, `TextID`) VALUES
 (90001, 42328);
