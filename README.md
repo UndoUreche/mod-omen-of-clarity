@@ -5,9 +5,13 @@
 
 ## Brief:
 
+<img width="1498" height="902" alt="image" src="https://github.com/user-attachments/assets/8d2c9f90-8b94-47e0-8ebe-d26ab55f22e4" />
+
 The mods adds one gameobject to dalaran's inscription hut which allows a druid/paladin player to apply the two wotlk classic glyphs:
 - **Glyph of hand of reckoning**
 - **Glyph of omen of clarity**
+
+<img width="558" height="666" alt="image" src="https://github.com/user-attachments/assets/be94a46a-fb2a-4bd4-abca-8f11d702df31" />
 
 The glyphs are not added as new items, and therefore the mod requires no client side modifications. Applying the glyphs causes the last
 glyph slot of the player to be locked on the current spec, and the ability to be modified as per the glyph's description. Disabling the glyph
