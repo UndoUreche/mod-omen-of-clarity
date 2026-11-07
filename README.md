@@ -1,5 +1,7 @@
 ## Credits:
 **Blinky:** original project and original solution for the implementation
+https://github.com/blinkysc/mod-omen-of-clarity
+https://github.com/blinkysc/mod-classic-glyphs
 
 ## Brief:
 
